@@ -124,7 +124,7 @@ namespace wmonitord
 
                 if (debug)
                 {
-                    Debug($"{now:T} -- {filename} -> {storage[filename].msElapsed}ms");
+                    Debug($"{now:T} -- {filename} -> {Math.Round((double)storage[filename].msElapsed / 1000 / 60, 1)}m {storage[filename].msElapsed}ms");
                 }
                 
             }, storage, exeptionCallback), null, 0, update_period);

@@ -7,7 +7,6 @@ namespace wmonitord
 {
     internal static class Wutils
     {
-
         [DllImport("user32.dll")]
         private static extern IntPtr GetForegroundWindow();
 
@@ -20,6 +19,7 @@ namespace wmonitord
         [DllImport("user32.dll")]
         private static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
 
+        private static readonly (string, string, uint) EMPTY_CURRENT_ACTIVE_WINDOW_DATA = (string.Empty, string.Empty, 0);
         private static uint GetActiveWindowProcessPid()
         {
             IntPtr hwnd = GetForegroundWindow();
@@ -29,16 +29,20 @@ namespace wmonitord
 
         public static (string title, string filename, uint pid) GetCurrentActiveWindowData()
         {
-            uint pid = GetActiveWindowProcessPid();
-            Process activeWindowProcess = Process.GetProcessById((int)pid);
             try
             {
+                uint pid = GetActiveWindowProcessPid();
+                Process activeWindowProcess = Process.GetProcessById((int)pid);
                 return (activeWindowProcess.MainWindowTitle, activeWindowProcess.MainModule.ModuleName, pid);
             }
             catch (Win32Exception)
             {
-                return (string.Empty, string.Empty, 0);
-            }            
+                return EMPTY_CURRENT_ACTIVE_WINDOW_DATA;
+            }
+            catch (NullReferenceException)
+            {
+                return EMPTY_CURRENT_ACTIVE_WINDOW_DATA;
+            }
         }
 
         public static void HideConsoleWindow()
