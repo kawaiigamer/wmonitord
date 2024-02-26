@@ -5,7 +5,7 @@ namespace wmonitord
 {
     internal class WindowActivityInformation
     {
-        public long msElapsed = 0;
+        public uint msElapsed = 0;
         public long lastTimeUpdated = 0;
         public readonly HashSet<string> titles = new HashSet<string>();
     }

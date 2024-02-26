@@ -12,12 +12,14 @@ namespace wmonitord
 
     class Daemon
     {
-        private static uint update_period = 2500;                  // Update period in ms
+        private static uint update_period = 2500;                 // Update period in ms
         private static uint save_period = 1000 * 5;               // Save & trim period in ms
-        private static uint life_time = 1000 * 60 * 60 * 24;       // Storage time in ms
+        private static uint life_time = 1000 * 60 * 60 * 24;      // Storage time in ms
         private static bool debug = true;                         // Put runtime information into stdout
 
-        private static RuntimeStorage storage = new RuntimeStorage();
+        private const string SYSTEM_IDLE_PROCESS_NAME = "Idle Process";
+
+        private static RuntimeStorage storage = new RuntimeStorage ();
 
         private static string GenerateReport(RuntimeStorage seq) =>
              string.Join("\n---\n", seq.Select(x =>
@@ -92,37 +94,37 @@ namespace wmonitord
             if (!debug)
             {
                 Wutils.HideConsoleWindow();
-            }            
+            }
 
-            Action<Exception> exeptionCallback = (e) =>
+            static void exeptionCallback(Exception e)
             {
                 if (debug)
                     Debug(e.Message);
-            };
+            }
 
             new System.Threading.Timer(CreateLock ( (e) =>
             {
-                var current = Wutils.GetCurrentActiveWindowData();                
+                var (title, filename, pid) = Wutils.GetCurrentActiveWindowData();                
 
-                if (string.IsNullOrEmpty(current.filename) || string.IsNullOrEmpty(current.title))
+                if (string.IsNullOrEmpty(filename) || string.IsNullOrEmpty(title))
                 {
-                    return;
+                    filename = SYSTEM_IDLE_PROCESS_NAME;
                 }
 
-                if (!storage.ContainsKey(current.filename))
+                if (!storage.ContainsKey(filename))
                 {
-                    storage[current.filename] = new WindowActivityInformation();
+                    storage[filename] = new WindowActivityInformation();
                 }
 
-                long now = DateTimeOffset.Now.ToUnixTimeMilliseconds();
+                DateTimeOffset now = DateTimeOffset.Now;
 
-                storage[current.filename].titles.Add(current.title);
-                storage[current.filename].msElapsed += update_period;
-                storage[current.filename].lastTimeUpdated = now;
+                storage[filename].titles.Add(title);
+                storage[filename].msElapsed += update_period;
+                storage[filename].lastTimeUpdated = now.ToUnixTimeMilliseconds();
 
                 if (debug)
                 {
-                    Debug($"{now} -- {current.filename} -> {storage[current.filename].msElapsed}ms");
+                    Debug($"{now:T} -- {filename} -> {storage[filename].msElapsed}ms");
                 }
                 
             }, storage, exeptionCallback), null, 0, update_period);
