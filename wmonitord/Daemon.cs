@@ -12,31 +12,26 @@ namespace wmonitord
 
     class Daemon
     {
-        private static long update_period = 2500;                  // Update period in ms
-        private static long save_period = 1000 * 60;               // Save & trim period in ms
-        private static long life_time = 1000 * 60 * 60 * 24;       // Storage time in ms
-        private static bool debug = false;                         // Put runtime information into stdout
-        private static long debug_display_period = 1000 * 60 * 5;  // Put runtime information for last period in ms
+        private static uint update_period = 2500;                  // Update period in ms
+        private static uint save_period = 1000 * 5;               // Save & trim period in ms
+        private static uint life_time = 1000 * 60 * 60 * 24;       // Storage time in ms
+        private static bool debug = true;                         // Put runtime information into stdout
 
         private static RuntimeStorage storage = new RuntimeStorage();
-
-        [DllImport("kernel32.dll")]
-        private static extern IntPtr GetConsoleWindow();
-
-        [DllImport("user32.dll")]
-        private static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
 
         private static string GenerateReport(RuntimeStorage seq) =>
              string.Join("\n---\n", seq.Select(x =>
                string.Format(
                    "{0}\n{1}",
-                   $"{x.Key} - {x.Value.msElapsed / 1000 / 60 / 60}h",
+                   $"{x.Key} - {x.Value.msElapsed}ms - {x.Value.msElapsed / 1000 / 60}m",
                    string.Join("\n", x.Value.titles.Select(t => $"    {t}"))
                )
             ));
 
-        private static void SaveReport(string data) => File.WriteAllText(string.Format("{0}/{1}.log",
-            Environment.GetFolderPath(Environment.SpecialFolder.Desktop), DateTime.Today.ToString("MM.dd")), data);
+        public static uint ParseString2uint(string s, uint @default) =>  uint.TryParse(s, out uint result) ? result : @default;
+
+        private static void SaveReport(string data) => File.WriteAllText(string.Format("{0}/wmonitord_activity_{1}.log",
+            Environment.GetFolderPath(Environment.SpecialFolder.Desktop), DateTime.Today.ToString("yyyy_MM_dd")), data);
 
         private static void Debug(string msg) => Console.WriteLine(msg);
 
@@ -50,7 +45,7 @@ namespace wmonitord
         private static TimerCallback CreateLock(Action<object?> f, object l, Action<Exception> exeptionCallback, int timeout = 1000) => (e) =>
         {
             bool lockTaken = false;
-            try
+            try 
             {
                 Monitor.TryEnter(l, timeout, ref lockTaken);
                 if (lockTaken)
@@ -77,12 +72,27 @@ namespace wmonitord
 
         static async Task Main(string[] args)
         {
-            const int SW_HIDE = 0;
-            IntPtr handle = GetConsoleWindow();
+            if (args.Length >= 1 && args[0]=="d")
+            {
+                debug = true;
+            }
+            if (args.Length >= 2)
+            {/*ms*/
+                update_period = ParseString2uint(args[1], update_period);
+            }
+            if (args.Length >= 3)
+            { /*ms*/
+                save_period = ParseString2uint(args[2], save_period); 
+            }
+            if (args.Length >= 4)
+            { /*h*/
+                life_time = ParseString2uint(args[3], 24) * 60 * 60 * 1000;
+            }
+
             if (!debug)
             {
-               ShowWindow(handle, SW_HIDE);
-            }
+                Wutils.HideConsoleWindow();
+            }            
 
             Action<Exception> exeptionCallback = (e) =>
             {
@@ -112,7 +122,7 @@ namespace wmonitord
 
                 if (debug)
                 {
-                    Debug(GenerateReport(TrimStorage(storage, debug_display_period)));
+                    Debug($"{now} -- {current.filename} -> {storage[current.filename].msElapsed}ms");
                 }
                 
             }, storage, exeptionCallback), null, 0, update_period);
@@ -121,7 +131,7 @@ namespace wmonitord
             {
                 SaveReport(GenerateReport(storage));
                 storage = TrimStorage(storage, life_time);
-            }, storage, exeptionCallback), null, 0, save_period);
+            }, storage, exeptionCallback), null, 0, save_period); 
 
             await Task.Delay(Timeout.Infinite, new CancellationToken()).ConfigureAwait(false);
         }
